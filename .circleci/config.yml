@@ -1,0 +1,38 @@
+version: 2
+jobs:
+  build:
+    working_directory: ~/code
+    docker:
+      - image: circleci/android:api-25-alpha
+    environment:
+      JVM_OPTS: -Xmx3200m
+    steps:
+      - checkout
+      - run:
+         name: Decode keystore
+         command: echo $ENCODED_KEYSTORE | base64 -di > ~/code/keystore.jks
+      - run:
+         name: export keystore
+         command: echo 'export KEYSTORE=~/code/keystore.jks' >> $BASH_ENV
+      - restore_cache:
+          key: jars-{{ checksum "build.gradle" }}-{{ checksum  "app/build.gradle" }}
+      - run:
+          name: Download Dependencies
+          command: ./gradlew androidDependencies
+      - save_cache:
+          paths:
+            - ~/.gradle
+          key: jars-{{ checksum "build.gradle" }}-{{ checksum  "app/build.gradle" }}
+      - run:
+          name: Generate Debug APK
+          command: ./gradlew assembleDebug
+      - store_artifacts:
+          path: app/build/outputs/apk/debug
+          destination: apks/
+      - run:
+          name: Generate Debug APK
+          command: ./gradlew assembleRelease
+      - store_artifacts:
+          path: app/build/outputs/apk/release
+          destination: apks/
+          # See https://circleci.com/docs/2.0/deployment-integrations/ for deploy examples

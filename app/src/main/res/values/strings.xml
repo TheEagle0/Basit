@@ -1,0 +1,31 @@
+<!--
+  ~ /*
+  ~  * Copyright [2019] [Muhammad Elkady] @kady.muhammad@gmail.com
+  ~  *
+  ~  * Licensed under the Apache License, Version 2.0 (the "License");
+  ~  * you may not use this file except in compliance with the License.
+  ~  * You may obtain a copy of the License at
+  ~  *
+  ~  *     http://www.apache.org/licenses/LICENSE-2.0
+  ~  *
+  ~  * Unless required by applicable law or agreed to in writing, software
+  ~  * distributed under the License is distributed on an "AS IS" BASIS,
+  ~  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~  * See the License for the specific language governing permissions and
+  ~  * limitations under the License.
+  ~  */
+  -->
+
+<resources>
+    <string name="app_name">Basit</string>
+    <string name="user_notification_channel_name">Quran</string>
+    <string name="user_notification_channel_desc">Quran</string>
+    <string name="play">play</string>
+    <string name="pause">pause</string>
+    <string name="next">next</string>
+    <string name="previous">previous</string>
+    <string name="empty_track_name">No Content</string>
+    <string name="media_metadata_genre">Quran</string>
+    <string name="zero_time">00:00:00</string>
+    <string name="error">Something went wrong</string>
+</resources>
