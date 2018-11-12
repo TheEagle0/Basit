@@ -1,27 +1,27 @@
 {
   "project_info": {
-    "project_number": "176008931659",
-    "firebase_url": "https://basit-1.firebaseio.com",
-    "project_id": "basit-1",
-    "storage_bucket": "basit-1.appspot.com"
+    "project_number": "637947265833",
+    "firebase_url": "https://basit-esraa.firebaseio.com",
+    "project_id": "basit-esraa",
+    "storage_bucket": "basit-esraa.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:176008931659:android:3d9275cc0fe54514",
+        "mobilesdk_app_id": "1:637947265833:android:3d9275cc0fe54514",
         "android_client_info": {
           "package_name": "com.basit"
         }
       },
       "oauth_client": [
         {
-          "client_id": "176008931659-el6el5fdu0jbv6rn97vg0simdie7lf1t.apps.googleusercontent.com",
+          "client_id": "637947265833-1pa3v4p2t7bnos6puuj8alfjfpkdrok9.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyAo45azqihmMXMaL9-_VcNaPHCphjtIllQ"
+          "current_key": "AIzaSyB10KcwnL3f9odVAbuMIYs3-QrswS52xBQ"
         }
       ],
       "services": {
