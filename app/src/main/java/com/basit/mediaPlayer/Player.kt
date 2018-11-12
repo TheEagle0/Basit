@@ -113,10 +113,6 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
             val hasOldInstance = ::exoPlayer.isInitialized
             "Preparing player ... hasOldInstance = $hasOldInstance play list id = ${playList.id} "
         })
-        if (::exoPlayer.isInitialized) {
-            exoPlayer.stop()
-            exoPlayer.release()
-        }
         val concatenatingMediaSources = ConcatenatingMediaSource(*uris.toMediaSources())
         exoPlayer = ExoPlayerFactory.newSimpleInstance(app, trackSelector)
         exoPlayer.addListener(PlayerListenerAdapter())
