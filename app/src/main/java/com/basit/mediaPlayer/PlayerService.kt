@@ -40,11 +40,7 @@ class PlayerService : MediaBrowserServiceCompat() {
 
         override fun onPrepareFromMediaId(mediaId: String?, extras: Bundle?) {
             val playList: Firebase.PlayList = extras!!.getParcelable(Key.KEY_FIREBASE_PLAY_LIST)!!
-            if (::player.isInitialized) {
-                player.pause()
-                player.stop()
-                player.release()
-            }
+            releaseOldPlayerInstance()
             player = Player(playList, this@PlayerService)
             mutableMediaSession.setExtras(extras.toPlayerBundle())
             player.preparePlayer()
@@ -81,6 +77,14 @@ class PlayerService : MediaBrowserServiceCompat() {
         override fun onSeekTo(pos: Long) = player.seekTo(pos)
 
         override fun onSkipToQueueItem(id: Long) = player.skipToTrack(id.toInt())
+    }
+
+    private fun releaseOldPlayerInstance() {
+        if (::player.isInitialized) {
+            player.pause()
+            player.stop()
+            player.release()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -130,7 +134,7 @@ class PlayerService : MediaBrowserServiceCompat() {
     }
 
     private fun initMediaSession(): MediaSessionCompat {
-        val mediaSession = MediaSessionCompat(this, "Basit Player Service")
+        val mediaSession = MediaSessionCompat(this, "BasitPlayerService")
         mediaSession.setFlags(MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS or MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS)
         mediaSession.setCallback(mediaSessionCallback)
         sessionToken = mediaSession.sessionToken
