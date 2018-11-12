@@ -208,6 +208,7 @@ class PlayerViewModel(val app: Application) : AndroidViewModel(app) {
             }
             if (oldPlayListId == newPlayListId && oldTrackId != newTrackId) {
                 skipTo(newTrackId)
+                play()
                 return@launch
             }
             if (oldPlayListId != newPlayListId && oldTrackId != newTrackId) {
