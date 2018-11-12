@@ -290,6 +290,7 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
         }
     }
 
+    @Suppress(names = ["DEPRECATION"])
     private fun requestAudioFocus(): Boolean {
         val audioManager = playerService.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val result =
@@ -301,6 +302,7 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
         return result
     }
 
+    @Suppress(names = ["DEPRECATION"])
     private fun abandonAudioFocus() {
         logInfo(LogTag.BASIT_PLAYER_TAG, { "Abandon audio focus" })
         val audioManager = playerService.getSystemService(Context.AUDIO_SERVICE) as AudioManager
