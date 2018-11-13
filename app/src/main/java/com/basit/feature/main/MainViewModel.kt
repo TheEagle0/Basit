@@ -44,14 +44,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         jobs += GlobalScope.launch {
             mutex.withLock {
                 runBlocking(Dispatchers.Main) { loading.value = true }
-                val result = RealTimeDB.getFBDBRoot()
-                when (result) {
-                    is Either.Right -> {
-                        val data = result.b.data
-                        basitItems.postValue(data)
-                    }
-                    is Either.Left -> {
-                        msg.postValue(result.a.msg)
+                RealTimeDB.getFBDBRoot {
+                    when (it) {
+                        is Either.Right -> {
+                            val data = it.b.data
+                            basitItems.postValue(data)
+                        }
+                        is Either.Left -> {
+                            msg.postValue(it.a.msg)
+                        }
                     }
                 }
                 runBlocking(Dispatchers.Main) { loading.value = false }

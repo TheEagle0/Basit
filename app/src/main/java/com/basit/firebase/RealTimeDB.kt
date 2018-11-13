@@ -27,8 +27,6 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 import com.basit.entity.Firebase.DBRoot as FDBRoot
 import com.basit.entity.Firebase.PlayList as FPlayList
 
@@ -40,8 +38,8 @@ object RealTimeDB {
         db
     }
 
-    suspend fun getFBDBRoot() = suspendCoroutine<Either<BasitError, BasitSuccess<Firebase.DBRoot>>> { continuation ->
-        db.value().reference.addListenerForSingleValueEvent(object : ValueEventListener {
+    fun getFBDBRoot(result: (Either<BasitError, BasitSuccess<Firebase.DBRoot>>) -> Unit) {
+        db.value().reference.addValueEventListener(object : ValueEventListener {
             override fun onCancelled(error: DatabaseError) {}
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
@@ -51,12 +49,12 @@ object RealTimeDB {
                             playLists.add(it.getValue(Firebase.PlayList::class.java)!!)
                         }
                         val root: Firebase.DBRoot = Firebase.DBRoot(playLists.toList())
-                        continuation.resume(Either.right(BasitSuccess(root)))
+                        result(Either.right(BasitSuccess(root)))
                     } else {
-                        continuation.resume(Either.left(BasitError("Error : data does exist but is null")))
+                        result(Either.left(BasitError("Error : data does exist but is null")))
                     }
                 } else {
-                    continuation.resume(Either.left(BasitError("Error : data does not exist")))
+                    result(Either.left(BasitError("Error : data does not exist")))
                 }
             }
         })
