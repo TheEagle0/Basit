@@ -36,20 +36,20 @@ import com.basit.base.constant.Language.ARABIC
 import com.basit.base.constant.UI.PLAYER_PROGRESS_DURATION_TIME_FORMAT
 import com.basit.entity.Firebase
 import com.google.android.material.snackbar.Snackbar
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.*
 import java.util.concurrent.TimeUnit
 
 
 /**************************************************************************************************/
-fun Long.millisToPlayerTime(): String =
-    if (this <= 0) String.format(Locale(ARABIC), PLAYER_PROGRESS_DURATION_TIME_FORMAT, 0, 0, 0)
-    else String.format(Locale(ARABIC),
-        PLAYER_PROGRESS_DURATION_TIME_FORMAT,
-        TimeUnit.MILLISECONDS.toHours(this),
-        TimeUnit.MILLISECONDS.toMinutes(this) - TimeUnit.HOURS.toMinutes(TimeUnit.MILLISECONDS.toHours(this)),
-        TimeUnit.MILLISECONDS.toSeconds(this) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(this)))
+fun Long.millisToPlayerTime(): String = if (this <= 0) String.format(Locale(ARABIC), PLAYER_PROGRESS_DURATION_TIME_FORMAT, 0, 0, 0)
+else String.format(Locale(ARABIC),
+    PLAYER_PROGRESS_DURATION_TIME_FORMAT,
+    TimeUnit.MILLISECONDS.toHours(this),
+    TimeUnit.MILLISECONDS.toMinutes(this) - TimeUnit.HOURS.toMinutes(TimeUnit.MILLISECONDS.toHours(this)),
+    TimeUnit.MILLISECONDS.toSeconds(this) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(this)))
 
 fun setLocaleToArabic(context: Context): Context {
     val locale = Locale(ARABIC)
@@ -64,11 +64,10 @@ fun AppCompatActivity.addFragment(f: Lazy<Fragment>, addToBackStack: Boolean = f
     val fragment = f.value
     val tag = fragment::class.java.simpleName
     fragment.arguments = arguments
-    supportFragmentManager.beginTransaction().setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE)
-        .add(R.id.container, fragment, tag).run {
-            if (addToBackStack) this.addToBackStack(tag)
-            commit()
-        }
+    supportFragmentManager.beginTransaction().setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE).add(R.id.container, fragment, tag).run {
+        if (addToBackStack) this.addToBackStack(tag)
+        commit()
+    }
 }
 
 fun getTracksFragmentArgs(playList: Firebase.PlayList): Bundle {
@@ -142,3 +141,8 @@ fun getARString(id: Int): String {
     configuration.setLocale(Locale(ARABIC))
     return BasitApp.basit.createConfigurationContext(configuration).resources.getString(id)
 }
+
+/**************************************************************************************************/
+fun launchWithLock(lock: Mutex, block: suspend () -> Unit): Unit = { GlobalScope.launch { lock.withLock { block() } } }()
+
+suspend fun <T> async(block: suspend () -> T): T = GlobalScope.async { block() }.await()

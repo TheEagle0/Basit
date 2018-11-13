@@ -53,27 +53,26 @@ import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory
 import com.google.android.exoplayer2.upstream.cache.CacheDataSourceFactory
 import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor
 import com.google.android.exoplayer2.upstream.cache.SimpleCache
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
-class Player(private val playList: Firebase.PlayList, private val playerService: PlayerService) : Runnable, AudioManager.OnAudioFocusChangeListener {
+class Player(private val playList: Firebase.PlayList, private val playerService: PlayerService) :
+    Runnable, AudioManager.OnAudioFocusChangeListener {
 
+    private var isNoisyReceiverRegistered = false
 
-    private val uris = playList.tracks.map { Uri.parse(StringBuilder(playList.baseURL).append("/").append(it.URL).toString()) }
+    private var playOnFocus: Boolean = false
+
+    private val uris = playList.tracks.map { Uri.parse(playList.baseURL).buildUpon().appendEncodedPath(it.URL).build() }
+
     private val noisyReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             logInfo(LogTag.BASIT_PLAYER_TAG, { "Noisy receiver was triggered with intent = $intent" })
             pause()
         }
     }
-    private var isNoisyReceiverRegistered = false
-    private lateinit var exoPlayer: SimpleExoPlayer
-    private var playOnFocus: Boolean = false
-    @RequiresApi(Build.VERSION_CODES.O) private val audioFocusRequest: () -> AudioFocusRequest = {
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private val audioFocusRequest: () -> AudioFocusRequest = {
         AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN).run {
             setAudioAttributes(AudioAttributes.Builder().run {
                 setUsage(AudioAttributes.USAGE_MEDIA)
@@ -86,45 +85,40 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
         }
     }.memoize()
 
-    override fun onAudioFocusChange(focusChange: Int) {
-        logInfo(LogTag.BASIT_PLAYER_TAG, { "Audio focus was changed to -> ${focusChange.toAudioFocusString()}" })
-        when (focusChange) {
-            AudioManager.AUDIOFOCUS_GAIN -> {
-                if (isPlaying()) exoPlayer.volume = 1F
-                if (playOnFocus && !isPlaying()) play()
-                playOnFocus = false
-            }
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                exoPlayer.volume = .3F
-            }
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                playOnFocus = true
-                pause()
-            }
-            AudioManager.AUDIOFOCUS_LOSS -> {
-                playOnFocus = false
-                pause()
-            }
-        }
+    private val exoPlayer: () -> SimpleExoPlayer = {
+        val exoPlayer = ExoPlayerFactory.newSimpleInstance(app, trackSelector)
+        exoPlayer.addListener(PlayerListenerAdapter())
+        exoPlayer
+    }.memoize()
+
+    private fun onAudioFocusLossTransientCanDuck() {
+        exoPlayer().volume = .3F
     }
 
-    fun preparePlayer(): Deferred<SimpleExoPlayer> = GlobalScope.async {
-        mutex.withLock {
-            logInfo(LogTag.BASIT_PLAYER_TAG, {
-                val hasOldInstance = ::exoPlayer.isInitialized
-                "Preparing player ... hasOldInstance = $hasOldInstance play list id = ${playList.id} "
-            })
-            val concatenatingMediaSources = ConcatenatingMediaSource(*uris.toMediaSources().await())
-            exoPlayer = ExoPlayerFactory.newSimpleInstance(app, trackSelector)
-            exoPlayer.addListener(PlayerListenerAdapter())
-            exoPlayer.prepare(concatenatingMediaSources)
-            return@async exoPlayer
-        }
+    private fun onAudioFocusLossTransient() {
+        playOnFocus = true
+        pause()
     }
 
-    private fun List<Uri>.toMediaSources(): Deferred<Array<ExtractorMediaSource>> = GlobalScope.async {
-        this@toMediaSources.map {
-            ExtractorMediaSource.Factory(cacheDataSource).createMediaSource(it)
+    private fun onAudioFocusLoss() {
+        playOnFocus = false
+        pause()
+    }
+
+    private fun onAudioFocusGain() {
+        if (isPlaying()) exoPlayer().volume = 1F
+        if (playOnFocus && !isPlaying()) play()
+        playOnFocus = false
+    }
+
+    fun preparePlayer(): Unit = launchWithLock(mutex) {
+        val concatenatingMediaSources = ConcatenatingMediaSource(*uris.toMediaSources())
+        exoPlayer().prepare(concatenatingMediaSources)
+    }
+
+    private suspend fun List<Uri>.toMediaSources(): Array<ExtractorMediaSource> = async {
+        map { uri ->
+            ExtractorMediaSource.Factory(cacheDataSource).createMediaSource(uri)
         }.toTypedArray()
     }
 
@@ -142,73 +136,50 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
         isNoisyReceiverRegistered = false
     }
 
-    private fun isPlaying(): Boolean = exoPlayer.playWhenReady
-    fun play() {
-        GlobalScope.launch {
-            mutex.withLock {
-                logInfo(LogTag.BASIT_PLAYER_TAG, { "Play was called in player" })
-                if (requestAudioFocus()) exoPlayer.playWhenReady = true
-            }
-        }
+    private fun isPlaying(): Boolean = exoPlayer().playWhenReady
+
+    fun play(): Unit = launchWithLock(mutex) {
+        logInfo(LogTag.BASIT_PLAYER_TAG, { "Play was called in player" })
+        if (requestAudioFocus()) exoPlayer().playWhenReady = true
     }
 
-    fun pause() {
-        GlobalScope.launch {
-            mutex.withLock {
-                logInfo(LogTag.BASIT_PLAYER_TAG, { "Pause was called in player" })
-                exoPlayer.playWhenReady = false
-                if (!playOnFocus) abandonAudioFocus()
-            }
-        }
+    fun pause(): Unit = launchWithLock(mutex) {
+        logInfo(LogTag.BASIT_PLAYER_TAG, { "Pause was called in player" })
+        exoPlayer().playWhenReady = false
+        if (!playOnFocus) abandonAudioFocus()
     }
 
-    fun skipToNext() {
-        GlobalScope.launch {
-            mutex.withLock {
-                logInfo(LogTag.BASIT_PLAYER_TAG, { "Skip to next was called in player" })
-                if (exoPlayer.currentWindowIndex < uris.lastIndex) exoPlayer.seekTo(exoPlayer.currentWindowIndex + 1, 0)
-                else exoPlayer.seekTo(0, 0)
-                if (!isPlaying()) play()
-            }
-        }
+    fun skipToNext(): Unit = launchWithLock(mutex) {
+        logInfo(LogTag.BASIT_PLAYER_TAG, { "Skip to next was called in player" })
+        if (exoPlayer().currentWindowIndex < uris.lastIndex) exoPlayer().seekTo(exoPlayer().currentWindowIndex + 1, 0)
+        else exoPlayer().seekTo(0, 0)
+        if (!isPlaying()) play()
     }
 
-    fun skipToPrevious() {
-        GlobalScope.launch {
-            mutex.withLock {
-                logInfo(LogTag.BASIT_PLAYER_TAG, { "Skip to previous was called in player" })
-                if (exoPlayer.currentWindowIndex == 0) exoPlayer.seekTo(uris.lastIndex, 0)
-                else exoPlayer.seekTo(exoPlayer.currentWindowIndex - 1, 0)
-                if (!isPlaying()) play()
-            }
-        }
+    fun skipToPrevious(): Unit = launchWithLock(mutex) {
+        logInfo(LogTag.BASIT_PLAYER_TAG, { "Skip to previous was called in player" })
+        if (exoPlayer().currentWindowIndex == 0) exoPlayer().seekTo(uris.lastIndex, 0)
+        else exoPlayer().seekTo(exoPlayer().currentWindowIndex - 1, 0)
+        if (!isPlaying()) play()
     }
 
-    fun stop() {
-        GlobalScope.launch {
-            mutex.withLock {
-                logInfo(LogTag.BASIT_PLAYER_TAG, { "Stop was called in player" })
-                stopForeground(true)
-                exoPlayer.stop()
-            }
-        }
+    fun stop(): Unit = launchWithLock(mutex) {
+        logInfo(LogTag.BASIT_PLAYER_TAG, { "Stop was called in player" })
+        stopForeground(true)
+        exoPlayer().stop()
     }
 
-    fun release() {
-        GlobalScope.launch {
-            mutex.withLock {
-                logInfo(LogTag.BASIT_PLAYER_TAG, { "Release was called in player" })
-                exoPlayer.release()
-            }
-        }
+    fun release(): Unit = launchWithLock(mutex) {
+        logInfo(LogTag.BASIT_PLAYER_TAG, { "Release was called in player" })
+        exoPlayer().release()
     }
 
     private fun buildMetadata(): MediaMetadataCompat {
-        val currentTrack = playList.tracks[exoPlayer.currentWindowIndex]
+        val currentTrack = playList.tracks[exoPlayer().currentWindowIndex]
         with(currentTrack) {
             metaDataBuilder.putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, "$id")
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTrack.name)
-                .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, exoPlayer.duration)
+                .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, exoPlayer().duration)
                 .putLong(MediaMetadataCompat.METADATA_KEY_DISC_NUMBER, playList.id.toLong())
                 .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, playList.name)
         }
@@ -227,40 +198,33 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
             else -> PlaybackStateCompat.ACTION_PLAY or PlaybackStateCompat.ACTION_SKIP_TO_NEXT or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
         }
         val playbackState =
-            playbackStateBuilder.setState(inPlaybackState, exoPlayer.currentPosition, exoPlayer.playbackParameters.speed).setActions(actions).build()
+            playbackStateBuilder.setState(inPlaybackState, exoPlayer().currentPosition, exoPlayer().playbackParameters.speed).setActions(actions)
+                .build()
         playerService.mediaSession.setPlaybackState(playbackState)
     }
 
-    fun seekTo(pos: Long) {
-        GlobalScope.launch {
-            mutex.withLock {
-                exoPlayer.seekTo(pos)
-            }
-        }
+    fun seekTo(pos: Long): Unit = launchWithLock(mutex) {
+        exoPlayer().seekTo(pos)
     }
 
-    fun skipToTrack(trackId: Int) {
-        GlobalScope.launch {
-            mutex.withLock {
-                exoPlayer.seekTo(playList.tracks.indexOfFirst { it.id == trackId }, 0L)
-            }
-        }
+    fun skipToTrack(trackId: Int): Unit = launchWithLock(mutex) {
+        exoPlayer().seekTo(playList.tracks.indexOfFirst { it.id == trackId }, 0L)
     }
 
     override fun run() {
         timeElapsedHandler.postDelayed(this, TIME_ELAPSED_HANDLER_UPDATE_INTERVAL)
-        bundle.putLong(Key.KEY_PLAYER_CURRENT_PROGRESS_MILLIS, exoPlayer.currentPosition)
+        bundle.putLong(Key.KEY_PLAYER_CURRENT_PROGRESS_MILLIS, exoPlayer().currentPosition)
         playerService.mediaSession.sendSessionEvent(Event.EVENT_UPDATE_PLAYER_ELAPSED_TIME, bundle)
     }
 
     fun setRepeatMode(repeatMode: Int) {
         when (repeatMode) {
             PlaybackStateCompat.REPEAT_MODE_ONE -> {
-                exoPlayer.repeatMode = Player.REPEAT_MODE_ONE
+                exoPlayer().repeatMode = Player.REPEAT_MODE_ONE
                 playerService.mediaSession.setRepeatMode(PlaybackStateCompat.REPEAT_MODE_ONE)
             }
             else -> {
-                exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
+                exoPlayer().repeatMode = Player.REPEAT_MODE_OFF
                 playerService.mediaSession.setRepeatMode(PlaybackStateCompat.REPEAT_MODE_NONE)
             }
         }
@@ -269,11 +233,11 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
     fun setShuffleMode(shuffleMode: Int) {
         when (shuffleMode) {
             PlaybackStateCompat.SHUFFLE_MODE_ALL -> {
-                exoPlayer.shuffleModeEnabled = true
+                exoPlayer().shuffleModeEnabled = true
                 playerService.mediaSession.setShuffleMode(PlaybackStateCompat.SHUFFLE_MODE_ALL)
             }
             PlaybackStateCompat.SHUFFLE_MODE_NONE -> {
-                exoPlayer.shuffleModeEnabled = false
+                exoPlayer().shuffleModeEnabled = false
                 playerService.mediaSession.setShuffleMode(PlaybackStateCompat.SHUFFLE_MODE_NONE)
             }
         }
@@ -297,7 +261,8 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
         }
     }
 
-    @Suppress(names = ["DEPRECATION"]) private fun requestAudioFocus(): Boolean {
+    @Suppress(names = ["DEPRECATION"])
+    private fun requestAudioFocus(): Boolean {
         val audioManager = playerService.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val result =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) audioManager.requestAudioFocus(audioFocusRequest()) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
@@ -308,7 +273,8 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
         return result
     }
 
-    @Suppress(names = ["DEPRECATION"]) private fun abandonAudioFocus() {
+    @Suppress(names = ["DEPRECATION"])
+    private fun abandonAudioFocus() {
         logInfo(LogTag.BASIT_PLAYER_TAG, { "Abandon audio focus" })
         val audioManager = playerService.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) audioManager.abandonAudioFocusRequest(audioFocusRequest())
@@ -333,7 +299,7 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
     private fun onSeek() {
         setMetaData()
         notifyOnly(false)
-        playerService.mediaSession.setExtras(getMediaSessionExtras(playList, playList.tracks[exoPlayer.currentWindowIndex]))
+        playerService.mediaSession.setExtras(getMediaSessionExtras(playList, playList.tracks[exoPlayer().currentWindowIndex]))
     }
 
     private fun startForeground(paused: Boolean) {
@@ -348,25 +314,27 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
         NotificationManager.notify(playerService, playerService.mediaSession, paused)
     }
 
+    override fun onAudioFocusChange(focusChange: Int) {
+        logInfo(LogTag.BASIT_PLAYER_TAG, { "Audio focus was changed to -> ${focusChange.toAudioFocusString()}" })
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_GAIN -> onAudioFocusGain()
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> onAudioFocusLossTransientCanDuck()
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> onAudioFocusLossTransient()
+            AudioManager.AUDIOFOCUS_LOSS -> onAudioFocusLoss()
+        }
+    }
+
     private inner class PlayerListenerAdapter : Player.EventListener {
 
         override fun onTimelineChanged(timeline: Timeline, manifest: Any?, reason: Int) {}
         override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {}
         override fun onSeekProcessed() {}
-        override fun onTracksChanged(trackGroups: TrackGroupArray, trackSelections: TrackSelectionArray) {
-        }
-
-        override fun onPlayerError(error: ExoPlaybackException) {
-        }
-
+        override fun onTracksChanged(trackGroups: TrackGroupArray, trackSelections: TrackSelectionArray) {}
+        override fun onPlayerError(error: ExoPlaybackException) {}
         override fun onLoadingChanged(isLoading: Boolean) {}
-
         override fun onPositionDiscontinuity(reason: Int) = onSeek()
-
         override fun onRepeatModeChanged(repeatMode: Int) {}
-
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {}
-
         override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
             logInfo(LogTag.BASIT_PLAYER_TAG, {
                 "ExoPlayer state changed to ${playbackState.toExoPlayerState()} , playWhenReady = $playWhenReady"
@@ -380,12 +348,12 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
     }
 
     companion object {
+        private const val TIME_ELAPSED_HANDLER_UPDATE_INTERVAL = 1000L
+        private const val AGENT = "com.basit"
         private val mutex = Mutex()
         private val bundle = Bundle()
         private val timeElapsedHandler = Handler()
         private val audioFocusHandler = Handler()
-        private const val TIME_ELAPSED_HANDLER_UPDATE_INTERVAL = 1000L
-        private const val AGENT = "com.basit"
         private val app: BasitApp = BasitApp.basit
         private val metaDataBuilder: MediaMetadataCompat.Builder = MediaMetadataCompat.Builder()
             .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, BitmapFactory.decodeResource(app.resources, R.drawable.album_art)).run {
