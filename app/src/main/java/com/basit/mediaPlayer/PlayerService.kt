@@ -58,7 +58,6 @@ class PlayerService : MediaBrowserServiceCompat() {
 
         override fun onSkipToNext() = player.skipToNext()
 
-
         override fun onSetRepeatMode(repeatMode: Int) = player.setRepeatMode(repeatMode)
 
         override fun onSetShuffleMode(shuffleMode: Int) = player.setShuffleMode(shuffleMode)

@@ -54,6 +54,7 @@ import com.google.android.exoplayer2.upstream.cache.CacheDataSourceFactory
 import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor
 import com.google.android.exoplayer2.upstream.cache.SimpleCache
 import kotlinx.coroutines.sync.Mutex
+import com.basit.mediaPlayer.Player as BPlayer
 
 class Player(private val playList: Firebase.PlayList, private val playerService: PlayerService) :
     Runnable, AudioManager.OnAudioFocusChangeListener {
@@ -87,7 +88,7 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
 
     private val exoPlayer: () -> SimpleExoPlayer = {
         val exoPlayer = ExoPlayerFactory.newSimpleInstance(app, trackSelector)
-        exoPlayer.addListener(PlayerListenerAdapter())
+        exoPlayer.addListener(PlayerListenerAdapter(this))
         exoPlayer
     }.memoize()
 
@@ -324,7 +325,12 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
         }
     }
 
-    private inner class PlayerListenerAdapter : Player.EventListener {
+    private object PlayerListenerAdapter : Player.EventListener {
+        private lateinit var player: BPlayer
+        operator fun invoke(player: BPlayer): PlayerListenerAdapter {
+            this.player = player
+            return this
+        }
 
         override fun onTimelineChanged(timeline: Timeline, manifest: Any?, reason: Int) {}
         override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {}
@@ -332,17 +338,17 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
         override fun onTracksChanged(trackGroups: TrackGroupArray, trackSelections: TrackSelectionArray) {}
         override fun onPlayerError(error: ExoPlaybackException) {}
         override fun onLoadingChanged(isLoading: Boolean) {}
-        override fun onPositionDiscontinuity(reason: Int) = onSeek()
+        override fun onPositionDiscontinuity(reason: Int) = player.onSeek()
         override fun onRepeatModeChanged(repeatMode: Int) {}
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {}
         override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
-            logInfo(LogTag.BASIT_PLAYER_TAG, {
-                "ExoPlayer state changed to ${playbackState.toExoPlayerState()} , playWhenReady = $playWhenReady"
-            })
-            when (playbackState) {
-                Player.STATE_BUFFERING -> onBuffering()
-                Player.STATE_ENDED -> onEnded()
-                Player.STATE_READY -> onReady(playWhenReady)
+            logInfo(LogTag.BASIT_PLAYER_TAG, { "ExoPlayer state changed to ${playbackState.toExoPlayerState()} , playWhenReady = $playWhenReady" })
+            with(player) {
+                when (playbackState) {
+                    Player.STATE_BUFFERING -> onBuffering()
+                    Player.STATE_ENDED -> onEnded()
+                    Player.STATE_READY -> onReady(playWhenReady)
+                }
             }
         }
     }
