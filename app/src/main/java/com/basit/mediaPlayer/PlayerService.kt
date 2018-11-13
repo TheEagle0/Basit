@@ -46,31 +46,22 @@ class PlayerService : MediaBrowserServiceCompat() {
             player.preparePlayer()
         }
 
-        override fun onSkipToPrevious() {
-            if (::player.isInitialized) player.skipToPrevious()
-        }
+        override fun onSkipToPrevious() = player.skipToPrevious()
 
-        override fun onPlay() {
-            if (::player.isInitialized) player.play()
-        }
+        override fun onPlay() = player.play()
 
         override fun onStop() {
-            if (::player.isInitialized) player.stop()
+            player.stop()
             releaseMediaSession()
             stopSelf()
         }
 
-        override fun onSkipToNext() {
-            if (::player.isInitialized) player.skipToNext()
-        }
+        override fun onSkipToNext() = player.skipToNext()
 
-        override fun onSetRepeatMode(repeatMode: Int) {
-            if (::player.isInitialized) player.setRepeatMode(repeatMode)
-        }
 
-        override fun onSetShuffleMode(shuffleMode: Int) {
-            if (::player.isInitialized) player.setShuffleMode(shuffleMode)
-        }
+        override fun onSetRepeatMode(repeatMode: Int) = player.setRepeatMode(repeatMode)
+
+        override fun onSetShuffleMode(shuffleMode: Int) = player.setShuffleMode(shuffleMode)
 
         override fun onPause() = player.pause()
 
