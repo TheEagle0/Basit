@@ -151,6 +151,10 @@ class PlayerFragment : Fragment() {
     private fun showError() {
         hideBuffering()
         playPause.setImageResource(R.drawable.ic_play)
+        playingTrackName.text = getString(R.string.empty_track_name)
+        progress.progress = 0
+        progressPercent?.progress = 0
+        progressText.text = 0L.millisToPlayerTime()
     }
 
     private fun showPlaying() {
@@ -166,6 +170,10 @@ class PlayerFragment : Fragment() {
     private fun showStopped() {
         hideBuffering()
         playPause.setImageResource(R.drawable.ic_play)
+        playingTrackName.text = getString(R.string.empty_track_name)
+        progress.progress = 0
+        progressPercent?.progress = 0
+        progressText.text = 0L.millisToPlayerTime()
     }
 
     fun play(playList: Firebase.PlayList, track: Firebase.Track) = internalPlay(playList, track)
