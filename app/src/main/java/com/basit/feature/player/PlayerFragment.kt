@@ -184,7 +184,10 @@ class PlayerFragment : Fragment() {
 
     private fun hideBuffering() = view?.let { buffering.hide() }
 
-    private fun showBuffering() = view?.let { buffering.show() }
+    private fun showBuffering() = view?.let {
+        buffering.show()
+        playPause.setImageResource(R.drawable.ic_pause)
+    }
 
     private fun setClickListeners() {
         playPause.setOnClickListener {
