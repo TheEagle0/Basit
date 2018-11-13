@@ -60,8 +60,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class Player(private val playList: Firebase.PlayList, private val playerService: PlayerService) :
-    Runnable, AudioManager.OnAudioFocusChangeListener {
+class Player(private val playList: Firebase.PlayList, private val playerService: PlayerService) : Runnable, AudioManager.OnAudioFocusChangeListener {
 
 
     private val uris = playList.tracks.map { Uri.parse(StringBuilder(playList.baseURL).append("/").append(it.URL).toString()) }
@@ -74,8 +73,7 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
     private var isNoisyReceiverRegistered = false
     private lateinit var exoPlayer: SimpleExoPlayer
     private var playOnFocus: Boolean = false
-    @RequiresApi(Build.VERSION_CODES.O)
-    private val audioFocusRequest: () -> AudioFocusRequest = {
+    @RequiresApi(Build.VERSION_CODES.O) private val audioFocusRequest: () -> AudioFocusRequest = {
         AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN).run {
             setAudioAttributes(AudioAttributes.Builder().run {
                 setUsage(AudioAttributes.USAGE_MEDIA)
@@ -110,27 +108,25 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
         }
     }
 
-    fun preparePlayer(): Deferred<SimpleExoPlayer> =
-        GlobalScope.async {
-            mutex.withLock {
-                logInfo(LogTag.BASIT_PLAYER_TAG, {
-                    val hasOldInstance = ::exoPlayer.isInitialized
-                    "Preparing player ... hasOldInstance = $hasOldInstance play list id = ${playList.id} "
-                })
-                val concatenatingMediaSources = ConcatenatingMediaSource(*uris.toMediaSources().await())
-                exoPlayer = ExoPlayerFactory.newSimpleInstance(app, trackSelector)
-                exoPlayer.addListener(PlayerListenerAdapter())
-                exoPlayer.prepare(concatenatingMediaSources)
-                return@async exoPlayer
-            }
+    fun preparePlayer(): Deferred<SimpleExoPlayer> = GlobalScope.async {
+        mutex.withLock {
+            logInfo(LogTag.BASIT_PLAYER_TAG, {
+                val hasOldInstance = ::exoPlayer.isInitialized
+                "Preparing player ... hasOldInstance = $hasOldInstance play list id = ${playList.id} "
+            })
+            val concatenatingMediaSources = ConcatenatingMediaSource(*uris.toMediaSources().await())
+            exoPlayer = ExoPlayerFactory.newSimpleInstance(app, trackSelector)
+            exoPlayer.addListener(PlayerListenerAdapter())
+            exoPlayer.prepare(concatenatingMediaSources)
+            return@async exoPlayer
         }
+    }
 
-    private fun List<Uri>.toMediaSources(): Deferred<Array<ExtractorMediaSource>> =
-        GlobalScope.async {
-            this@toMediaSources.map {
-                ExtractorMediaSource.Factory(cacheDataSource).createMediaSource(it)
-            }.toTypedArray()
-        }
+    private fun List<Uri>.toMediaSources(): Deferred<Array<ExtractorMediaSource>> = GlobalScope.async {
+        this@toMediaSources.map {
+            ExtractorMediaSource.Factory(cacheDataSource).createMediaSource(it)
+        }.toTypedArray()
+    }
 
     private fun registerNoisyReceiver() {
         logInfo(LogTag.BASIT_PLAYER_TAG, { "Registering noisy receiver" })
@@ -227,8 +223,7 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
     private fun setPlaybackState(inPlaybackState: Int) {
         logInfo(LogTag.BASIT_PLAYER_TAG, { "Set playback state was called in player with ${inPlaybackState.toPlaybackState()}" })
         val actions = when (inPlaybackState) {
-            PlaybackStateCompat.STATE_PLAYING, PlaybackStateCompat.STATE_BUFFERING ->
-                PlaybackStateCompat.ACTION_PAUSE or PlaybackStateCompat.ACTION_SKIP_TO_NEXT or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+            PlaybackStateCompat.STATE_PLAYING, PlaybackStateCompat.STATE_BUFFERING -> PlaybackStateCompat.ACTION_PAUSE or PlaybackStateCompat.ACTION_SKIP_TO_NEXT or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
             else -> PlaybackStateCompat.ACTION_PLAY or PlaybackStateCompat.ACTION_SKIP_TO_NEXT or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
         }
         val playbackState =
@@ -237,10 +232,21 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
     }
 
     fun seekTo(pos: Long) {
-        exoPlayer.seekTo(pos)
+        GlobalScope.launch {
+            mutex.withLock {
+                exoPlayer.seekTo(pos)
+            }
+        }
     }
 
-    fun skipToTrack(trackId: Int) = exoPlayer.seekTo(playList.tracks.indexOfFirst { it.id == trackId }, 0L)
+    fun skipToTrack(trackId: Int) {
+        GlobalScope.launch {
+            mutex.withLock {
+                exoPlayer.seekTo(playList.tracks.indexOfFirst { it.id == trackId }, 0L)
+            }
+        }
+    }
+
     override fun run() {
         timeElapsedHandler.postDelayed(this, TIME_ELAPSED_HANDLER_UPDATE_INTERVAL)
         bundle.putLong(Key.KEY_PLAYER_CURRENT_PROGRESS_MILLIS, exoPlayer.currentPosition)
@@ -291,8 +297,7 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
         }
     }
 
-    @Suppress(names = ["DEPRECATION"])
-    private fun requestAudioFocus(): Boolean {
+    @Suppress(names = ["DEPRECATION"]) private fun requestAudioFocus(): Boolean {
         val audioManager = playerService.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val result =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) audioManager.requestAudioFocus(audioFocusRequest()) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
@@ -303,8 +308,7 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
         return result
     }
 
-    @Suppress(names = ["DEPRECATION"])
-    private fun abandonAudioFocus() {
+    @Suppress(names = ["DEPRECATION"]) private fun abandonAudioFocus() {
         logInfo(LogTag.BASIT_PLAYER_TAG, { "Abandon audio focus" })
         val audioManager = playerService.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) audioManager.abandonAudioFocusRequest(audioFocusRequest())
