@@ -112,7 +112,7 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
         playOnFocus = false
     }
 
-    fun preparePlayer(): Unit = launchWithLock(mutex) {
+    fun preparePlayer(): Unit = launchWithLock(playerMutex) {
         val concatenatingMediaSources = ConcatenatingMediaSource(*uris.toMediaSources())
         exoPlayer().prepare(concatenatingMediaSources)
     }
@@ -139,38 +139,38 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
 
     private fun isPlaying(): Boolean = exoPlayer().playWhenReady
 
-    fun play(): Unit = launchWithLock(mutex) {
+    fun play(): Unit = launchWithLock(playerMutex) {
         logInfo(LogTag.BASIT_PLAYER_TAG, { "Play was called in player" })
         if (requestAudioFocus()) exoPlayer().playWhenReady = true
     }
 
-    fun pause(): Unit = launchWithLock(mutex) {
+    fun pause(): Unit = launchWithLock(playerMutex) {
         logInfo(LogTag.BASIT_PLAYER_TAG, { "Pause was called in player" })
         exoPlayer().playWhenReady = false
         if (!playOnFocus) abandonAudioFocus()
     }
 
-    fun skipToNext(): Unit = launchWithLock(mutex) {
+    fun skipToNext(): Unit = launchWithLock(playerMutex) {
         logInfo(LogTag.BASIT_PLAYER_TAG, { "Skip to next was called in player" })
         if (exoPlayer().currentWindowIndex < uris.lastIndex) exoPlayer().seekTo(exoPlayer().currentWindowIndex + 1, 0)
         else exoPlayer().seekTo(0, 0)
         if (!isPlaying()) play()
     }
 
-    fun skipToPrevious(): Unit = launchWithLock(mutex) {
+    fun skipToPrevious(): Unit = launchWithLock(playerMutex) {
         logInfo(LogTag.BASIT_PLAYER_TAG, { "Skip to previous was called in player" })
         if (exoPlayer().currentWindowIndex == 0) exoPlayer().seekTo(uris.lastIndex, 0)
         else exoPlayer().seekTo(exoPlayer().currentWindowIndex - 1, 0)
         if (!isPlaying()) play()
     }
 
-    fun stop(): Unit = launchWithLock(mutex) {
+    fun stop(): Unit = launchWithLock(playerMutex) {
         logInfo(LogTag.BASIT_PLAYER_TAG, { "Stop was called in player" })
         stopForeground(true)
         exoPlayer().stop()
     }
 
-    fun release(): Unit = launchWithLock(mutex) {
+    fun release(): Unit = launchWithLock(playerMutex) {
         logInfo(LogTag.BASIT_PLAYER_TAG, { "Release was called in player" })
         exoPlayer().release()
     }
@@ -204,11 +204,11 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
         playerService.mediaSession.setPlaybackState(playbackState)
     }
 
-    fun seekTo(pos: Long): Unit = launchWithLock(mutex) {
+    fun seekTo(pos: Long): Unit = launchWithLock(playerMutex) {
         exoPlayer().seekTo(pos)
     }
 
-    fun skipToTrack(trackId: Int): Unit = launchWithLock(mutex) {
+    fun skipToTrack(trackId: Int): Unit = launchWithLock(playerMutex) {
         exoPlayer().seekTo(playList.tracks.indexOfFirst { it.id == trackId }, 0L)
     }
 
@@ -356,7 +356,7 @@ class Player(private val playList: Firebase.PlayList, private val playerService:
     companion object {
         private const val TIME_ELAPSED_HANDLER_UPDATE_INTERVAL = 1000L
         private const val AGENT = "com.basit"
-        private val mutex = Mutex()
+        private val playerMutex = Mutex()
         private val bundle = Bundle()
         private val timeElapsedHandler = Handler()
         private val audioFocusHandler = Handler()
