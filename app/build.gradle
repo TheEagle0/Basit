@@ -68,7 +68,7 @@ ext.legacy_version = "1.0.0"
 ext.aacompat_version = "1.0.0"
 ext.media_version = "1.0.0"
 ext.arrow_version = "0.8.0"
-ext.exo_player_verion = "2.8.4"
+ext.exo_player_verion = "2.9.1"
 ext.fetch_version = "2.2.0-RC14"
 //@formatter:on
 
