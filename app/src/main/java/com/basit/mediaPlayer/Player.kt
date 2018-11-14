@@ -35,6 +35,7 @@ import android.os.Handler
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.annotation.RequiresApi
+import arrow.syntax.function.memoize
 import com.basit.R
 import com.basit.base.*
 import com.basit.base.constant.Event
@@ -78,7 +79,7 @@ object Player : Runnable, AudioManager.OnAudioFocusChangeListener {
     private var isNoisyReceiverRegistered: Boolean = false
     /**###########################################################################################*/
     @RequiresApi(Build.VERSION_CODES.O)
-    private val audioFocusRequest: AudioFocusRequest =
+    private val audioFocusRequest: () -> AudioFocusRequest = {
         AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN).run {
             setAudioAttributes(AudioAttributes.Builder().run {
                 setUsage(AudioAttributes.USAGE_MEDIA)
@@ -89,6 +90,7 @@ object Player : Runnable, AudioManager.OnAudioFocusChangeListener {
             setOnAudioFocusChangeListener(this@Player, audioFocusHandler)
             build()
         }
+    }.memoize()
     /**###########################################################################################*/
     private val noisyReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -326,7 +328,7 @@ object Player : Runnable, AudioManager.OnAudioFocusChangeListener {
     private fun requestAudioFocus(): Boolean {
         val audioManager = playerService.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val result =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) audioManager.requestAudioFocus(audioFocusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) audioManager.requestAudioFocus(audioFocusRequest()) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
             else audioManager.requestAudioFocus(this,
                 AudioManager.STREAM_MUSIC,
                 AUDIOFOCUS_GAIN) == android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED
@@ -339,7 +341,7 @@ object Player : Runnable, AudioManager.OnAudioFocusChangeListener {
     private fun abandonAudioFocus() {
         logInfo(LogTag.BASIT_PLAYER_TAG, { "abandonAudioFocus --> " })
         val audioManager = playerService.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) audioManager.abandonAudioFocusRequest(audioFocusRequest)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) audioManager.abandonAudioFocusRequest(audioFocusRequest())
         else audioManager.abandonAudioFocus(this)
     }
 
