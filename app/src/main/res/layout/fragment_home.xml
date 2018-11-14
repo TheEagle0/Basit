@@ -16,11 +16,11 @@
   ~  */
   -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-             xmlns:app="http://schemas.android.com/apk/res-auto"
-             xmlns:tools="http://schemas.android.com/tools"
-             android:id="@+id/loadingContainer"
-             android:layout_width="match_parent"
-             android:layout_height="match_parent">
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/loadingContainer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
 
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:id="@+id/root"
@@ -52,7 +52,7 @@
                     android:layout_gravity="center_vertical"
                     android:gravity="center"
                     android:padding="16dp"
-                    android:src="@drawable/ic_quran"/>
+                    app:srcCompat="@drawable/ic_quran" />
 
                 <androidx.appcompat.widget.Toolbar
                     android:id="@+id/t"
@@ -72,7 +72,7 @@
             android:layout_height="match_parent"
             android:background="@color/colorBackgroundDark"
             app:layout_behavior="@string/appbar_scrolling_view_behavior"
-            tools:listitem="@layout/basit_item"/>
+            tools:listitem="@layout/basit_item" />
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 </FrameLayout>
