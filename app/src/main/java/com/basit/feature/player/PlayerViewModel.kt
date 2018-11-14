@@ -223,7 +223,6 @@ class PlayerViewModel(val app: Application) : AndroidViewModel(app) {
         bundle.putParcelable(Key.KEY_FIREBASE_TRACK, track)
         mediaControllerCompat.transportControls.prepareFromMediaId("${playList.id}", bundle)
         mediaControllerCompat.transportControls.play()
-        mediaControllerCompat.transportControls.skipToQueueItem(track.id.toLong())
     }
 
     private fun pause() {

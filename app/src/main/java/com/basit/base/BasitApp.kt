@@ -19,11 +19,18 @@
 package com.basit.base
 
 import androidx.multidex.MultiDexApplication
+import com.basit.mediaPlayer.Player
 
 class BasitApp : MultiDexApplication() {
+
+    lateinit var player: Player
+
     override fun onCreate() {
         super.onCreate()
         mutableBasitApp = this
+        player = Player
+        player.initPlayerComponents(this)
+        player.initPlayer(this)
     }
 
     companion object {

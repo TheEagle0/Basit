@@ -25,12 +25,13 @@ import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.session.MediaSessionCompat
 import androidx.media.MediaBrowserServiceCompat
 import androidx.media.session.MediaButtonReceiver
+import com.basit.base.BasitApp
 import com.basit.base.constant.Key
 import com.basit.entity.Firebase
 
 class PlayerService : MediaBrowserServiceCompat() {
 
-    private lateinit var player: Player
+    private val player: Player by lazy { Player }
 
     private lateinit var mutableMediaSession: MediaSessionCompat
 
@@ -40,10 +41,13 @@ class PlayerService : MediaBrowserServiceCompat() {
 
         override fun onPrepareFromMediaId(mediaId: String?, extras: Bundle?) {
             val playList: Firebase.PlayList = extras!!.getParcelable(Key.KEY_FIREBASE_PLAY_LIST)!!
-            releaseOldPlayerInstance()
-            player = Player(playList, this@PlayerService)
+            val track: Firebase.Track = extras.getParcelable(Key.KEY_FIREBASE_TRACK)!!
+            (application as BasitApp).run {
+                this.player = Player(playList, this@PlayerService)
+            }
             mutableMediaSession.setExtras(extras.toPlayerBundle())
             player.preparePlayer()
+            player.skipToTrack(track.id)
         }
 
         override fun onSkipToPrevious() = player.skipToPrevious()
@@ -69,14 +73,6 @@ class PlayerService : MediaBrowserServiceCompat() {
         override fun onSkipToQueueItem(id: Long) = player.skipToTrack(id.toInt())
     }
 
-    private fun releaseOldPlayerInstance() {
-        if (::player.isInitialized) {
-            player.pause()
-            player.stop()
-            player.release()
-        }
-    }
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         MediaButtonReceiver.handleIntent(mediaSession, intent)
         return Service.START_NOT_STICKY
@@ -99,8 +95,7 @@ class PlayerService : MediaBrowserServiceCompat() {
     }
 
     private fun handleOnDestroy() {
-        releaseMediaSession()
-        if (::player.isInitialized) player.release()
+        releaseMediaSession();player.release()
     }
 
     private fun releaseMediaSession() {
